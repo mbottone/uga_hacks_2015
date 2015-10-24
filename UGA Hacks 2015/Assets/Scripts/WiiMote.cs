@@ -13,22 +13,41 @@ public class WiiMote : MonoBehaviour {
     int currentUpdate = 0;
     int diffLength = 0;
 
+    int playerCount = 0;
+    bool activated = false;
+
+    Wiimote steering;
+    Wiimote speedMote;
+    bool resetData = false;
+    float currentAngle = 0.0f;
+
     void InitWiimotes()
     {
         WiimoteManager.FindWiimotes(); // Poll native bluetooth drivers to find Wiimotes
         foreach (Wiimote remote in WiimoteManager.Wiimotes)
         {
             Debug.Log("Found Wiimote");
-            remote.SendPlayerLED(true, false, false, false);
-            remote.SendDataReportMode(InputDataType.REPORT_BUTTONS_ACCEL);
+            playerCount++;
+            if (playerCount == 1)
+            {
+                speedMote = remote;
+                speedMote.SendPlayerLED(true, false, false, false);
+                speedMote.SendDataReportMode(InputDataType.REPORT_BUTTONS_ACCEL);
+            }
+            else
+            {
+                steering = remote;
+                steering.SendPlayerLED(false, true, false, false);
+                steering.SendDataReportMode(InputDataType.REPORT_BUTTONS_EXT19);
+                steering.RequestIdentifyWiiMotionPlus();
+            }
+            
         }
     }
     void FinishedWithWiimotes()
     {
-        foreach (Wiimote remote in WiimoteManager.Wiimotes)
-        {
-            WiimoteManager.Cleanup(remote);
-        }
+        WiimoteManager.Cleanup(steering);
+        WiimoteManager.Cleanup(speedMote);
     }
 
     // Use this for initialization
@@ -43,14 +62,14 @@ public class WiiMote : MonoBehaviour {
 	
 	// Update is called once per frame
 	void Update () {
-        Wiimote remote = WiimoteManager.Wiimotes[0];
+
         int ret;
         do
         {
-            ret = remote.ReadWiimoteData();
+            ret = speedMote.ReadWiimoteData();
         } while (ret > 0);
 
-        float[] data = remote.Accel.GetCalibratedAccelData();
+        float[] data = speedMote.Accel.GetCalibratedAccelData();
         float x = data[0];
         float y = data[1];
         float z = data[2];
@@ -68,10 +87,39 @@ public class WiiMote : MonoBehaviour {
 
         float speed = smoothDiff / Time.smoothDeltaTime;
 
-        Debug.Log(speed);
+        //Debug.Log(speed);
 
         lastAngle = angle;
-	}
+
+        do
+        {
+            ret = steering.ReadWiimoteData();
+        } while (ret > 0);
+
+        if (!activated && steering.wmp_attached)
+        {
+            Debug.Log("Activating WiiMotion Plus...");
+            steering.ActivateWiiMotionPlus();
+            activated = true;
+        }
+        if (activated && steering.current_ext == ExtensionController.MOTIONPLUS)
+        {
+            MotionPlusData motionData = steering.MotionPlus; // data!
+
+            float dPitch = motionData.YawSpeed - 6.0f;
+
+            if (Mathf.Abs(dPitch) < 0.5f)
+            {
+                dPitch = 0.0f;
+            }
+
+            float dist = dPitch * Time.deltaTime;
+            currentAngle += dist;
+
+            Debug.Log(currentAngle);
+            // Use the data...
+        }
+    }
 
     float GetSmoothDiff(float diff)
     {
@@ -93,7 +141,7 @@ public class WiiMote : MonoBehaviour {
         return runningAverage / diffLength;
     }
 
-    void OnApplicationClose ()
+    void OnApplicationQuit()
     {
         FinishedWithWiimotes();
     }
