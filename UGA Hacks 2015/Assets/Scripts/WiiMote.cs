@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 using WiimoteApi;
+using UnityStandardAssets.Vehicles.Car;
 
 public class WiiMote : MonoBehaviour {
 
@@ -54,11 +55,16 @@ public class WiiMote : MonoBehaviour {
     void Start () {
         InitWiimotes();
 
-        for (int i = 0;i < smooth; i ++)
+        for (int i = 0; i < smooth; i++)
         {
             diffStorage[i] = 0.0f;
         }
-	}
+    }
+
+    void Awake ()
+    {
+        
+    }
 	
 	// Update is called once per frame
 	void Update () {
@@ -108,17 +114,25 @@ public class WiiMote : MonoBehaviour {
 
             float dPitch = motionData.YawSpeed - 6.0f;
 
-            if (Mathf.Abs(dPitch) < 0.5f)
+            if (Mathf.Abs(dPitch) < 1.0f)
             {
                 dPitch = 0.0f;
             }
 
-            float dist = dPitch * Time.deltaTime;
-            currentAngle += dist;
+            float dist = dPitch * Time.deltaTime * -0.5f;
+            currentAngle -= dist;
 
-            Debug.Log(currentAngle);
+            GetComponent<CarController>().Move(dist, speed, 0, 0);
+            HandlebarRotate[] comps = GetComponentsInChildren<HandlebarRotate>();
+            foreach (HandlebarRotate comp in comps)
+            {
+                comp.speed = dist;
+            }
+
             // Use the data...
         }
+
+        
     }
 
     float GetSmoothDiff(float diff)
