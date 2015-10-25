@@ -3,7 +3,8 @@ using System.Collections;
 using WiimoteApi;
 using UnityStandardAssets.Vehicles.Car;
 
-public class WiiMote : MonoBehaviour {
+public class WiiMote : MonoBehaviour
+{
 
     float lastAngle = 0.0f;
     float updateInterval = 0.1f;
@@ -39,10 +40,10 @@ public class WiiMote : MonoBehaviour {
             {
                 steering = remote;
                 steering.SendPlayerLED(false, true, false, false);
-                steering.SendDataReportMode(InputDataType.REPORT_BUTTONS_EXT19);
+                steering.SendDataReportMode(InputDataType.REPORT_BUTTONS_ACCEL_EXT16);
                 steering.RequestIdentifyWiiMotionPlus();
             }
-            
+
         }
     }
     void FinishedWithWiimotes()
@@ -52,7 +53,8 @@ public class WiiMote : MonoBehaviour {
     }
 
     // Use this for initialization
-    void Start () {
+    void Start()
+    {
         InitWiimotes();
 
         for (int i = 0; i < smooth; i++)
@@ -61,13 +63,14 @@ public class WiiMote : MonoBehaviour {
         }
     }
 
-    void Awake ()
+    void Awake()
     {
-        
+
     }
-	
-	// Update is called once per frame
-	void Update () {
+
+    // Update is called once per frame
+    void Update()
+    {
 
         int ret;
         do
@@ -119,20 +122,29 @@ public class WiiMote : MonoBehaviour {
                 dPitch = 0.0f;
             }
 
-            float dist = dPitch * Time.deltaTime * -0.5f;
-            currentAngle -= dist;
+            data = steering.Accel.GetCalibratedAccelData();
+            float center = data[1];
 
-            GetComponent<CarController>().Move(dist, speed, 0, 0);
+            float dist = dPitch * Time.deltaTime * -0.5f;
+            currentAngle += dist;
+
+            if (Mathf.Abs(center - 0.4f) < 0.02 && Mathf.Abs(currentAngle) > 3.0f)
+            {
+                currentAngle *= 0.9f;
+            }
+
+            GetComponent<CarController>().Move(currentAngle / 20.0f, speed, 0, 0);
             HandlebarRotate[] comps = GetComponentsInChildren<HandlebarRotate>();
             foreach (HandlebarRotate comp in comps)
             {
                 comp.speed = dist;
+                comp.angle = currentAngle;
             }
 
             // Use the data...
         }
 
-        
+
     }
 
     float GetSmoothDiff(float diff)
